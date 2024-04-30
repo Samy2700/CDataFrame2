@@ -1,0 +1,3 @@
+C:/Users/samya/CLionProjects/CDataFrame2/cmake-build-debug/CMakeFiles/CDataFrame2.dir
+C:/Users/samya/CLionProjects/CDataFrame2/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/samya/CLionProjects/CDataFrame2/cmake-build-debug/CMakeFiles/rebuild_cache.dir
