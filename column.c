@@ -20,7 +20,7 @@ COLUMN *create_column(ENUM_TYPE type, const char *title) {
     col->column_type = type;
     col->data = NULL; // Start with an empty data array
     col->index = NULL; // Start without an index
-    
+
 
     return col;
 }
@@ -180,6 +180,7 @@ void print_col(COLUMN *col) {
         return;
     }
 
+    printf("Column '%s':\n", col->title);
     char value_str[256]; // Buffer for converted value string
     for (unsigned int i = 0; i < col->size; ++i) {
         convert_value(col, i, value_str, sizeof(value_str));

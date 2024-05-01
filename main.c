@@ -1,91 +1,56 @@
 #include "cdataframe.h"
 #include <stdio.h>
-
-// Helper function to get character input from the user
-char get_char_input(const char *prompt) {
-    char input;
-    printf("%s", prompt);
-    scanf(" %c", &input);  // Read a single character input
-    return input;
-}
-
-// Helper function to get integer input from the user
-int get_int_input(const char *prompt) {
-    int input;
-    printf("%s", prompt);
-    scanf("%d", &input);  // Read an integer input
-    return input;
-}
+#include <stdlib.h>
 
 int main() {
-    // Create a new dataframe
+    printf("Starting the DataFrame application...\n");
+
+    // Create a new DataFrame
     DATAFRAME *df = create_dataframe();
-    if (df == NULL) {
-        fprintf(stderr, "Failed to create dataframe.\n");
+    if (!df) {
+        fprintf(stderr, "Failed to create DataFrame.\n");
         return EXIT_FAILURE;
     }
 
-    // Create a column for characters
-    COLUMN *mycol = create_column(CHAR, "Character Column");
-    if (mycol == NULL) {
-        fprintf(stderr, "Failed to create column.\n");
+    // Define and add columns of various types
+    COLUMN *intColumn = create_column(INT, "Integer Column");
+    COLUMN *floatColumn = create_column(FLOAT, "Float Column");
+    COLUMN *stringColumn = create_column(STRING, "String Column");
+
+    // Check if columns are created successfully
+    if (!intColumn || !floatColumn || !stringColumn) {
+        fprintf(stderr, "Failed to create one or more columns.\n");
         free_dataframe(df);
         return EXIT_FAILURE;
     }
 
-    // Add the column to the dataframe
-    add_column_to_dataframe(df, mycol);
+    // Add columns to the DataFrame
+    add_column_to_dataframe(df, intColumn);
+    add_column_to_dataframe(df, floatColumn);
+    add_column_to_dataframe(df, stringColumn);
 
-    // Input characters into the column
-    char input_char = get_char_input("Enter a character: ");
-    if (!insert_value(mycol, &input_char)) {
-        fprintf(stderr, "Failed to insert value into the column.\n");
-        free_dataframe(df);
-        return EXIT_FAILURE;
+    // Inserting data into the DataFrame
+    int intValue = 100;
+    float floatValue = 1.23;
+    char *stringValue = "example";
+
+    for (int i = 0; i < 5; i++) { // Add 5 rows
+        void *row[] = {
+                &intValue,    // Integer data
+                &floatValue,  // Float data
+                stringValue   // String data
+        };
+        add_row_to_dataframe(df, row);
+        intValue++;
+        floatValue += 1.1f;
+        // String remains constant; could vary if needed
     }
 
-    input_char = get_char_input("Enter another character: ");
-    if (!insert_value(mycol, &input_char)) {
-        fprintf(stderr, "Failed to insert value into the column.\n");
-        free_dataframe(df);
-        return EXIT_FAILURE;
-    }
+    // Display the full DataFrame contents
+    printf("Complete DataFrame contents:\n");
+    print_dataframe(df);
 
-    // Display the full dataframe
-    printf("Contents of the dataframe:\n");
-    display_full_dataframe(df);
-
-    // Create another column for integers
-    COLUMN *intCol = create_column(INT, "Integer Column");
-    if (intCol == NULL) {
-        fprintf(stderr, "Failed to create integer column.\n");
-        free_dataframe(df);
-        return EXIT_FAILURE;
-    }
-
-    // Add the integer column to the dataframe
-    add_column_to_dataframe(df, intCol);
-
-    // Input integers into the new column
-    int input_int = get_int_input("Enter an integer: ");
-    if (!insert_value(intCol, &input_int)) {
-        fprintf(stderr, "Failed to insert integer into the column.\n");
-        free_dataframe(df);
-        return EXIT_FAILURE;
-    }
-
-    input_int = get_int_input("Enter another integer: ");
-    if (!insert_value(intCol, &input_int)) {
-        fprintf(stderr, "Failed to insert integer into the column.\n");
-        free_dataframe(df);
-        return EXIT_FAILURE;
-    }
-
-    // Display updated dataframe
-    printf("Updated contents of the dataframe:\n");
-    display_full_dataframe(df);
-
-    // Clean up and free the allocated dataframe and its columns
+    // Cleanup: Free all resources associated with the DataFrame
     free_dataframe(df);
 
     return EXIT_SUCCESS;
