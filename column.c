@@ -1,151 +1,146 @@
 #include "column.h"
-#include <stdio.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define REALOC_SIZE 256
 
 
-// Function to create a column with a specified type
-COLUMN *create_column(ENUM_TYPE type, const char *title) {
-    COLUMN *col = (COLUMN *)malloc(sizeof(COLUMN));
 
-    if (!col) {
-        fprintf(stderr, "Memory allocation failed for column creation.\n");
+// Create a new column with specified type and title
+COLUMN *create_column(ENUM_TYPE type, char *title) {
+    COLUMN *col = (COLUMN *)malloc(sizeof(COLUMN));
+    if (col == NULL) {
+        fprintf(stderr, "Failed to allocate memory for column structure.\n");
         return NULL;
     }
 
-    col->title = strdup(title); // Allocate and copy the title
+    col->title = strdup(title); // Duplicate the title for the column
+    if (col->title == NULL) {
+        free(col);
+        fprintf(stderr, "Failed to allocate memory for column title.\n");
+        return NULL;
+    }
+
     col->size = 0;
     col->max_size = 0;
     col->column_type = type;
-    col->data = NULL; // Start with an empty data array
-    col->index = NULL; // Start without an index
-
+    col->data = NULL; // Initialize data pointer as NULL
+    col->index = NULL; // Indexing not handled at creation
 
     return col;
 }
 
-
 // Function to insert a value into the column
 int insert_value(COLUMN *col, void *value) {
-    if (col->size == col->max_size) {
-        size_t new_max_size = col->max_size + REALOC_SIZE;
-        void **new_data = realloc(col->data, new_max_size * sizeof(void*));
-
+    if (col->size >= col->max_size) {
+        size_t new_max_size = col->max_size == 0 ? REALOC_SIZE : col->max_size + REALOC_SIZE;
+        COL_TYPE **new_data = (COL_TYPE **)realloc(col->data, new_max_size * sizeof(COL_TYPE *));
         if (!new_data) {
             fprintf(stderr, "Memory reallocation failed.\n");
             return 0;
         }
-
         col->data = new_data;
         col->max_size = new_max_size;
     }
 
-    // Allocate memory and insert the value based on the type
+    // Allocate memory for the new value based on the type of the column
+    void *new_value = NULL;
     switch (col->column_type) {
         case UINT:
-            col->data[col->size] = value ? malloc(sizeof(unsigned int)) : NULL;
-            if (value && col->data[col->size]) {
-                *(unsigned int *)(col->data[col->size]) = *(unsigned int *)value;
-            }
+            new_value = malloc(sizeof(unsigned int));
+            if (new_value) *(unsigned int *)new_value = *(unsigned int *)value;
             break;
         case INT:
-            col->data[col->size] = value ? malloc(sizeof(int)) : NULL;
-            if (value && col->data[col->size]) {
-                *(int *)(col->data[col->size]) = *(int *)value;
-            }
+            new_value = malloc(sizeof(int));
+            if (new_value) *(int *)new_value = *(int *)value;
             break;
         case CHAR:
-            col->data[col->size] = value ? malloc(sizeof(char)) : NULL;
-            if (value && col->data[col->size]) {
-                *(char *)(col->data[col->size]) = *(char *)value;
-            }
+            new_value = malloc(sizeof(char));
+            if (new_value) *(char *)new_value = *(char *)value;
             break;
         case FLOAT:
-            col->data[col->size] = value ? malloc(sizeof(float)) : NULL;
-            if (value && col->data[col->size]) {
-                *(float *)(col->data[col->size]) = *(float *)value;
-            }
+            new_value = malloc(sizeof(float));
+            if (new_value) *(float *)new_value = *(float *)value;
             break;
         case DOUBLE:
-            col->data[col->size] = value ? malloc(sizeof(double)) : NULL;
-            if (value && col->data[col->size]) {
-                *(double *)(col->data[col->size]) = *(double *)value;
-            }
+            new_value = malloc(sizeof(double));
+            if (new_value) *(double *)new_value = *(double *)value;
             break;
         case STRING:
-            col->data[col->size] = value ? strdup(*(char **)value) : NULL;
+            new_value = strdup((char *)value);
             break;
         case STRUCTURE:
-            col->data[col->size] = value ? malloc(sizeof(CustomStructure)) : NULL;
-            if (value && col->data[col->size]) {
-                memcpy(col->data[col->size], value, sizeof(CustomStructure));
-            }
+            new_value = malloc(sizeof(struct CustomStructure));  // Assuming CustomStructure is defined elsewhere
+            if (new_value) memcpy(new_value, value, sizeof(struct CustomStructure));
             break;
         default:
-            fprintf(stderr, "Unsupported data type for insertion.\n");
+            fprintf(stderr, "Unsupported type for insertion.\n");
             return 0;
     }
 
-
-    if (value && col->data[col->size] == NULL) {
-        fprintf(stderr, "Memory allocation failed for data insertion.\n");
+    if (!new_value) {
+        fprintf(stderr, "Memory allocation for new value failed.\n");
         return 0;
     }
 
-    col->size++;
+    col->data[col->size++] = new_value;
     return 1;
 }
 
+// Function to free the memory allocated for a column
+void delete_column(COLUMN **col_ptr) {
+    if (col_ptr == NULL || *col_ptr == NULL) {
+        fprintf(stderr, "Attempt to delete a null column pointer.\n");
+        return;
+    }
 
-void delete_column(COLUMN **col) {
-    if (col == NULL || *col == NULL) return;
+    COLUMN *col = *col_ptr;
 
-    // Free each data element based on the column type
-    for (unsigned int i = 0; i < (*col)->size; i++) {
-        if ((*col)->data[i] == NULL) continue;
-
-        switch ((*col)->column_type) {
-            case UINT:
-            case INT:
-            case FLOAT:
-            case DOUBLE:
-                free((*col)->data[i]); // For primitive data types, a simple free is sufficient
-                break;
-            case STRING:
-                free((char *)(*col)->data[i]); // Cast to char* before freeing
-                break;
-            case STRUCTURE:
-                free((*col)->data[i]); // Free the allocated structure memory
-                break;
-            default:
-                // If there are any other types that require special handling, add cases for them
-                break;
+    // Free each element in the data array
+    for (unsigned int i = 0; i < col->size; i++) {
+        if (col->data[i] != NULL) {
+            if (col->column_type == STRING) {
+                free(*(char **)(col->data[i]));  // Free the string before the pointer
+            }
+            free(col->data[i]);  // Free the data pointer itself
         }
     }
 
-    // Free the data array itself
-    free((*col)->data);
+    // Free the data array pointer
+    free(col->data);
 
-    // Free the index array if it exists
-    if ((*col)->index != NULL) {
-        free((*col)->index);
-    }
+    // Free the column title and the column struct itself
+    free(col->title);
+    free(col);
 
-    // Free the title string
-    free((*col)->title);
-
-    // Finally, free the column structure
-    free(*col);
-    *col = NULL;
+    // Set the pointer in the original reference to NULL
+    *col_ptr = NULL;
 }
 
+
+void CustomStructureToString(CustomStructure *cs, char *str, size_t size) {
+    if (cs == NULL || str == NULL) {
+        snprintf(str, size, "NULL");
+        return;
+    }
+    // Create a formatted string with structure's fields
+    snprintf(str, size, "ID: %d, Value: %.2f, Description: %s", cs->id, cs->value, cs->description);
+}
+
+
+// Function to convert a column value to a string based on its data type
 void convert_value(COLUMN *col, unsigned long long int index, char *str, int size) {
+    if (col == NULL || str == NULL) {
+        snprintf(str, size, "NULL");
+        return;
+    }
     if (index >= col->size || col->data[index] == NULL) {
         snprintf(str, size, "NULL");
         return;
     }
 
+    // Convert value based on its type
     switch (col->column_type) {
         case UINT:
             snprintf(str, size, "%u", *(unsigned int *)(col->data[index]));
@@ -162,37 +157,41 @@ void convert_value(COLUMN *col, unsigned long long int index, char *str, int siz
         case DOUBLE:
             snprintf(str, size, "%.2lf", *(double *)(col->data[index]));
             break;
+        case STRING:
+            snprintf(str, size, "%s", (char *)(col->data[index]));
+            break;
         case STRUCTURE:
-        {
-            CustomStructure *cs = (CustomStructure *)(col->data[index]);
-            snprintf(str, size, "ID: %d, Value: %.2f", cs->id, cs->value);
-        }
+            CustomStructureToString((CustomStructure *)(col->data[index]), str, size);
             break;
         default:
-            snprintf(str, size, "UNKNOWN");
+            snprintf(str, size, "Unsupported Type");
             break;
     }
 }
 
+// Function to print the contents of a column
 void print_col(COLUMN *col) {
-    if (!col) {
-        printf("Column is NULL\n");
+    if (col == NULL) {
+        printf("Attempt to print a null column.\n");
         return;
     }
 
     printf("Column '%s':\n", col->title);
-    char value_str[256]; // Buffer for converted value string
-    for (unsigned int i = 0; i < col->size; ++i) {
-        convert_value(col, i, value_str, sizeof(value_str));
-        printf("[%u] %s\n", i, value_str);
+    char buffer[256]; // Buffer to hold the string representation of each value
+
+    for (unsigned int i = 0; i < col->size; i++) {
+        convert_value(col, i, buffer, sizeof(buffer));
+        printf("[%u] %s\n", i, buffer);
     }
 }
 
-// New function to count occurrences of a value
+
+// Function to count the number of occurrences of a value
 int count_occurrences(COLUMN *col, void *value) {
-    if (!col || !value) return 0;
+    if (col == NULL || value == NULL) return 0;
+
     int count = 0;
-    for (unsigned int i = 0; i < col->size; ++i) {
+    for (unsigned int i = 0; i < col->size; i++) {
         if (compare_values(col->column_type, col->data[i], value) == 0) {
             count++;
         }
@@ -200,17 +199,18 @@ int count_occurrences(COLUMN *col, void *value) {
     return count;
 }
 
-// New function to get the value at a specific index
+// Function to get the value at a given position
 void *get_value_at(COLUMN *col, unsigned int index) {
-    if (index >= col->size || !col->data) return NULL;
+    if (col == NULL || index >= col->size) return NULL;
     return col->data[index];
 }
 
-// New function to count values greater than a given value
+// Function to count the number of values greater than a given value
 int count_greater_than(COLUMN *col, void *value) {
-    if (!col || !value) return 0;
+    if (col == NULL || value == NULL) return 0;
+
     int count = 0;
-    for (unsigned int i = 0; i < col->size; ++i) {
+    for (unsigned int i = 0; i < col->size; i++) {
         if (compare_values(col->column_type, col->data[i], value) > 0) {
             count++;
         }
@@ -218,11 +218,12 @@ int count_greater_than(COLUMN *col, void *value) {
     return count;
 }
 
-// New function to count values less than a given value
+// Function to count the number of values less than a given value
 int count_less_than(COLUMN *col, void *value) {
-    if (!col || !value) return 0;
+    if (col == NULL || value == NULL) return 0;
+
     int count = 0;
-    for (unsigned int i = 0; i < col->size; ++i) {
+    for (unsigned int i = 0; i < col->size; i++) {
         if (compare_values(col->column_type, col->data[i], value) < 0) {
             count++;
         }
@@ -230,31 +231,33 @@ int count_less_than(COLUMN *col, void *value) {
     return count;
 }
 
-// New function to count values equal to a given value
+// Function to count the number of values equal to a given value
 int count_equal_to(COLUMN *col, void *value) {
     return count_occurrences(col, value);
 }
 
-// Helper function for value comparison
+// Helper function to compare two values based on the column type
 int compare_values(ENUM_TYPE type, void *data1, void *data2) {
-    if (!data1 || !data2) return -2; // Return -2 for invalid comparison
+    if (data1 == NULL || data2 == NULL) return -1; // Indicating invalid comparison
+
     switch (type) {
-        case UINT:
-            return (*(unsigned int *)data1 > *(unsigned int *)data2) - (*(unsigned int *)data1 < *(unsigned int *)data2);
         case INT:
             return (*(int *)data1 > *(int *)data2) - (*(int *)data1 < *(int *)data2);
-        case CHAR:
-            return (*(char *)data1 > *(char *)data2) - (*(char *)data1 < *(char *)data2);
         case FLOAT:
             return (*(float *)data1 > *(float *)data2) - (*(float *)data1 < *(float *)data2);
         case DOUBLE:
             return (*(double *)data1 > *(double *)data2) - (*(double *)data1 < *(double *)data2);
+        case CHAR:
+            return (*(char *)data1 > *(char *)data2) - (*(char *)data1 < *(char *)data2);
         case STRING:
-            return strcmp(*(char **)data1, *(char **)data2);
+            return strcmp((char *)data1, (char *)data2);
         case STRUCTURE:
-            // Custom comparison for CustomStructure, assuming comparison based on 'value'
-            return (((CustomStructure *)data1)->value > ((CustomStructure *)data2)->value) - (((CustomStructure *)data1)->value < ((CustomStructure *)data2)->value);
+            return ((CustomStructure *)data1)->value > ((CustomStructure *)data2)->value ? 1 :
+                   ((CustomStructure *)data1)->value < ((CustomStructure *)data2)->value ? -1 : 0;
         default:
-            return -2; // Unsupported type comparison
+            fprintf(stderr, "Unsupported type for comparison.\n");
+            return -1; // Unsupported type
     }
 }
+
+

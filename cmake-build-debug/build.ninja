@@ -67,6 +67,12 @@ build CMakeFiles/CDataFrame2.dir/cdataframe.c.obj: C_COMPILER__CDataFrame2_unsca
   OBJECT_DIR = CMakeFiles\CDataFrame2.dir
   OBJECT_FILE_DIR = CMakeFiles\CDataFrame2.dir
 
+build CMakeFiles/CDataFrame2.dir/sort.c.obj: C_COMPILER__CDataFrame2_unscanned_Debug C$:/Users/samya/CLionProjects/CDataFrame2/sort.c || cmake_object_order_depends_target_CDataFrame2
+  DEP_FILE = CMakeFiles\CDataFrame2.dir\sort.c.obj.d
+  FLAGS = -g -std=gnu2x -fdiagnostics-color=always
+  OBJECT_DIR = CMakeFiles\CDataFrame2.dir
+  OBJECT_FILE_DIR = CMakeFiles\CDataFrame2.dir
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target CDataFrame2
@@ -75,7 +81,7 @@ build CMakeFiles/CDataFrame2.dir/cdataframe.c.obj: C_COMPILER__CDataFrame2_unsca
 #############################################
 # Link the executable CDataFrame2.exe
 
-build CDataFrame2.exe: C_EXECUTABLE_LINKER__CDataFrame2_Debug CMakeFiles/CDataFrame2.dir/main.c.obj CMakeFiles/CDataFrame2.dir/column.c.obj CMakeFiles/CDataFrame2.dir/cdataframe.c.obj
+build CDataFrame2.exe: C_EXECUTABLE_LINKER__CDataFrame2_Debug CMakeFiles/CDataFrame2.dir/main.c.obj CMakeFiles/CDataFrame2.dir/column.c.obj CMakeFiles/CDataFrame2.dir/cdataframe.c.obj CMakeFiles/CDataFrame2.dir/sort.c.obj
   FLAGS = -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\CDataFrame2.dir

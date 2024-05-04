@@ -1,332 +1,419 @@
 #include "cdataframe.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include "string.h"
 
-// Create an empty dataframe with predefined maximum capacity
+// Creates an empty dataframe
 DATAFRAME *create_dataframe() {
     DATAFRAME *df = (DATAFRAME *)malloc(sizeof(DATAFRAME));
     if (!df) {
-        fprintf(stderr, "Failed to allocate memory for the dataframe.\n");
+        fprintf(stderr, "Memory allocation failed for the dataframe.\n");
         return NULL;
     }
-    df->columns = (COLUMN **)malloc(sizeof(COLUMN *) * 10); // Default capacity
-    if (!df->columns) {
-        free(df);
-        fprintf(stderr, "Failed to allocate memory for columns in the dataframe.\n");
-        return NULL;
-    }
+    df->columns = NULL;
     df->column_count = 0;
-    df->max_columns = 10;
+    df->max_columns = 0;
     return df;
 }
 
-// Add a column to the dataframe
-void add_column_to_dataframe(DATAFRAME *df, COLUMN *col) {
-    if (df->column_count >= df->max_columns) {
-        // Reallocate memory to accommodate more columns
-        df->max_columns += 10;
-        df->columns = (COLUMN **)realloc(df->columns, sizeof(COLUMN *) * df->max_columns);
-        if (!df->columns) {
-            fprintf(stderr, "Failed to reallocate memory for columns.\n");
-            return;
-        }
-    }
-    df->columns[df->column_count++] = col;
-}
-
-// Remove a column from the dataframe by its index
-void remove_column_from_dataframe(DATAFRAME *df, unsigned int index) {
-    if (index >= df->column_count) {
-        fprintf(stderr, "Index out of bounds for removing column.\n");
+// Fills the dataframe from user input
+void fill_dataframe_from_user(DATAFRAME *df) {
+    if (!df) {
+        fprintf(stderr, "Dataframe is NULL.\n");
         return;
     }
-    delete_column(&df->columns[index]); // Utilize the delete_column function from column.c
+
+    printf("Enter the number of columns: ");
+    int num_columns;
+    scanf("%d", &num_columns);
+    df->columns = (COLUMN **)malloc(num_columns * sizeof(COLUMN *));
+    df->max_columns = num_columns;
+    df->column_count = 0;
+
+    for (int i = 0; i < num_columns; i++) {
+        char type[20], name[100];
+        printf("Enter type and name of column %d (e.g., INT Age): ", i + 1);
+        scanf("%s %s", type, name);
+        ENUM_TYPE col_type = parse_type(type);
+        COLUMN *new_column = create_column(col_type, name);
+        if (!new_column) {
+            continue;
+        }
+        add_column_to_dataframe(df, new_column);
+
+        printf("Enter the number of rows for column '%s': ", name);
+        int num_rows;
+        scanf("%d", &num_rows);
+        for (int j = 0; j < num_rows; j++) {
+            printf("Enter data for row %d: ", j + 1);
+            void *data = read_data_based_on_type(col_type);
+            insert_value(new_column, data);
+        }
+    }
+}
+
+// Converts a string representation of a type into an ENUM_TYPE
+ENUM_TYPE parse_type(const char *typeStr) {
+    if (strcmp(typeStr, "INT") == 0) return INT;
+    else if (strcmp(typeStr, "FLOAT") == 0) return FLOAT;
+    else if (strcmp(typeStr, "DOUBLE") == 0) return DOUBLE;
+    else if (strcmp(typeStr, "CHAR") == 0) return CHAR;
+    else if (strcmp(typeStr, "STRING") == 0) return STRING;
+    else if (strcmp(typeStr, "STRUCTURE") == 0) return STRUCTURE;
+    return -1; // Invalid type
+}
+
+
+// Example of a hard_fill_dataframe function without dynamic type determination
+void hard_fill_dataframe(DATAFRAME *df, void **data, unsigned int num_rows, unsigned int num_columns) {
+    if (!df || !data) {
+        fprintf(stderr, "Invalid arguments for hard filling the dataframe.\n");
+        return;
+    }
+
+    for (unsigned int i = 0; i < num_columns; i++) {
+        ENUM_TYPE fixed_type = INT; // Example fixed type, replace with actual logic
+        COLUMN *col = create_column(fixed_type, "Predefined Column");
+        add_column_to_dataframe(df, col);
+        for (unsigned int j = 0; j < num_rows; j++) {
+            insert_value(col, ((void **)data[i])[j]); // Assuming data is appropriately typed
+        }
+    }
+}
+
+
+// Reads data from standard input based on the specified type and returns a pointer to the data
+void *read_data_based_on_type(ENUM_TYPE type) {
+    void *data = NULL;
+    switch (type) {
+        case INT: {
+            int *value = malloc(sizeof(int));
+            printf("Enter an integer: ");
+            scanf("%d", value);
+            data = value;
+            break;
+        }
+        case FLOAT: {
+            float *value = malloc(sizeof(float));
+            printf("Enter a float: ");
+            scanf("%f", value);
+            data = value;
+            break;
+        }
+        case DOUBLE: {
+            double *value = malloc(sizeof(double));
+            printf("Enter a double: ");
+            scanf("%lf", value);
+            data = value;
+            break;
+        }
+        case CHAR: {
+            char *value = malloc(sizeof(char));
+            printf("Enter a char: ");
+            scanf(" %c", value);
+            data = value;
+            break;
+        }
+        case STRING: {
+            char *value = malloc(256); // Define a reasonable max length for strings
+            printf("Enter a string: ");
+            scanf("%255s", value); // Avoid buffer overflow
+            data = value;
+            break;
+        }
+        case STRUCTURE: {
+            // Assuming CustomStructure has been defined with known fields
+            CustomStructure *value = malloc(sizeof(CustomStructure));
+            printf("Enter structure values (id, value): ");
+            scanf("%d %lf", &value->id, &value->value);
+            data = value;
+            break;
+        }
+        default:
+            printf("Unsupported data type.\n");
+            break;
+    }
+    return data;
+}
+
+// Frees resources associated with the dataframe
+void free_dataframe(DATAFRAME *df) {
+    if (df == NULL) return;
+
+    // Loop through each column and delete it using delete_column
+    for (unsigned int i = 0; i < df->column_count; i++) {
+        if (df->columns[i] != NULL) {
+            delete_column(df->columns[i]);  // Ensure this function frees all resources within the column
+        }
+    }
+
+    // Free the array of column pointers
+    free(df->columns);
+
+    // Finally free the dataframe structure itself
+    free(df);
+}
+
+// Adds a column to the dataframe
+int add_column_to_dataframe(DATAFRAME *df, COLUMN *col) {
+    if (df == NULL || col == NULL) return -1;
+    if (df->column_count == df->max_columns) {
+        size_t new_size = df->max_columns == 0 ? 1 : df->max_columns * 2;
+        COLUMN **new_cols = realloc(df->columns, new_size * sizeof(COLUMN *));
+        if (!new_cols) return -1;
+        df->columns = new_cols;
+        df->max_columns = new_size;
+    }
+    df->columns[df->column_count++] = col;
+    return 0;
+}
+
+// Displays the entire dataframe
+void display_full_dataframe(DATAFRAME *df) {
+    if (!df || !df->columns) {
+        printf("The dataframe is empty or uninitialized.\n");
+        return;
+    }
+    printf("Dataframe contains %u columns:\n", df->column_count);
+    for (unsigned int i = 0; i < df->column_count; i++) {
+        printf("Column %d: %s\n", i + 1, df->columns[i]->title);
+        print_col(df->columns[i]);  // Assuming print_col() is a function to print column data
+    }
+}
+
+void display_dataframe_rows(DATAFRAME *df, unsigned int rows) {
+    if (!df || !df->columns) {
+        printf("The dataframe is empty or uninitialized.\n");
+        return;
+    }
+    printf("Displaying up to %u rows from each of the %u columns:\n", rows, df->column_count);
+    for (unsigned int i = 0; i < df->column_count; i++) {
+        COLUMN *col = df->columns[i];
+        printf("Column %d (%s):\n", i + 1, col->title);
+
+        // Print each row in the column up to the specified limit
+        for (unsigned int j = 0; j < rows && j < col->size; j++) {
+            switch (col->column_type) {
+                case INT:
+                    printf("%d: %d\n", j + 1, *((int*)col->data[j]));
+                    break;
+                case FLOAT:
+                    printf("%d: %f\n", j + 1, *((float*)col->data[j]));
+                    break;
+                case DOUBLE:
+                    printf("%d: %lf\n", j + 1, *((double*)col->data[j]));
+                    break;
+                case STRING:
+                    printf("%d: %s\n", j + 1, (char*)col->data[j]);
+                    break;
+                case STRUCTURE:
+                    CustomStructure *cs = (CustomStructure*)col->data[j];
+                    printf("%d: ID = %d, Value = %.2f\n", j + 1, cs->id, cs->value);
+                    break;
+                default:
+                    printf("%d: Unhandled data type.\n", j + 1);
+                    break;
+            }
+        }
+    }
+}
+
+
+void add_row_to_dataframe(DATAFRAME *df, void **row_data) {
+    if (!df || !df->columns) {
+        printf("Dataframe is not properly initialized.\n");
+        return;
+    }
+    for (unsigned int i = 0; i < df->column_count; i++) {
+        if (insert_value(df->columns[i], row_data[i]) != 0) {
+            printf("Failed to insert data in column %d.\n", i + 1);
+        }
+    }
+}
+
+void delete_row_from_dataframe(DATAFRAME *df, unsigned int row_index) {
+    if (!df) {
+        printf("Dataframe is not initialized.\n");
+        return;
+    }
+
+    // Check each column to ensure the row index is valid before deletion
+    for (unsigned int i = 0; i < df->column_count; i++) {
+        if (row_index >= df->columns[i]->size) {
+            printf("Row index %u is out of bounds for column %u.\n", row_index, i + 1);
+            return;  // If any column doesn't have enough rows, abort the operation
+        }
+    }
+
+    // Decrease the size of each column by one, effectively hiding the last row
+    // This is a logical deletion and does not free any memory
+    for (unsigned int i = 0; i < df->column_count; i++) {
+        df->columns[i]->size--;
+    }
+}
+
+
+void display_dataframe_columns(DATAFRAME *df, unsigned int columns) {
+    if (!df || !df->columns) {
+        printf("Dataframe is empty or uninitialized.\n");
+        return;
+    }
+    printf("Displaying the first %u columns out of %u total columns:\n", columns, df->column_count);
+    for (unsigned int i = 0; i < columns && i < df->column_count; i++) {
+        printf("Column %u (%s):\n", i + 1, df->columns[i]->title);
+        print_col(df->columns[i]);  // Assumes a function to print column data
+    }
+}
+
+
+void remove_column_from_dataframe(DATAFRAME *df, unsigned int index) {
+    if (!df || index >= df->column_count) {
+        printf("Invalid column index or empty dataframe.\n");
+        return;
+    }
+    // Free the column resources
+    delete_column(df->columns[index]);  // Assumes free_column correctly frees all column data
+
+    // Shift all columns to the left to fill the gap
     for (unsigned int i = index; i < df->column_count - 1; i++) {
         df->columns[i] = df->columns[i + 1];
     }
     df->column_count--;
-}
 
-// Free all memory associated with the dataframe
-void free_dataframe(DATAFRAME *df) {
-    if (!df) return;
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        delete_column(&df->columns[i]);
-    }
-    free(df->columns);
-    free(df);
-}
-
-// Retrieve a column from the dataframe by index
-COLUMN *get_column(DATAFRAME *df, unsigned int index) {
-    if (index >= df->column_count) {
-        fprintf(stderr, "Index out of bounds for getting column.\n");
-        return NULL;
-    }
-    return df->columns[index];
-}
-
-// Print the entire dataframe
-void print_dataframe(DATAFRAME *df) {
-    if (!df) {
-        printf("Dataframe is NULL\n");
-        return;
-    }
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        printf("Column %u: %s\n", i, df->columns[i]->title);
-        print_col(df->columns[i]);
-    }
-}
-
-// Initialize a dataframe with empty columns based on its capacity
-void initialize_empty_dataframe(DATAFRAME *df) {
-    if (!df) return;
-    for (unsigned int i = 0; i < df->max_columns; i++) {
-        df->columns[i] = create_column(INT, ""); // Initialize with default type INT
-    }
-    df->column_count = df->max_columns;
-}
-
-// Prompt user to fill the dataframe
-void fill_dataframe_from_user(DATAFRAME *df) {
-    if (!df) return;
-    printf("Enter data for each column as prompted.\n");
-
-    char buffer[256]; // Buffer to hold string inputs
-
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        printf("Filling data for column: %s\n", df->columns[i]->title);
-        switch (df->columns[i]->column_type) {
-            case INT: {
-                int value;
-                printf("Enter an integer for column '%s': ", df->columns[i]->title);
-                scanf("%d", &value);
-                insert_value(df->columns[i], &value);
-                break;
-            }
-            case FLOAT: {
-                float value;
-                printf("Enter a float for column '%s': ", df->columns[i]->title);
-                scanf("%f", &value);
-                insert_value(df->columns[i], &value);
-                break;
-            }
-            case DOUBLE: {
-                double value;
-                printf("Enter a double for column '%s': ", df->columns[i]->title);
-                scanf("%lf", &value);
-                insert_value(df->columns[i], &value);
-                break;
-            }
-            case CHAR: {
-                char value;
-                printf("Enter a char for column '%s': ", df->columns[i]->title);
-                scanf(" %c", &value);
-                insert_value(df->columns[i], &value);
-                break;
-            }
-            case STRING: {
-                printf("Enter a string for column '%s': ", df->columns[i]->title);
-                scanf("%s", buffer);
-                insert_value(df->columns[i], buffer);
-                break;
-            }
-            case STRUCTURE: {
-                // CustomStructure input handling
-                CustomStructure cs;
-                printf("Enter ID and value for column '%s': ", df->columns[i]->title);
-                scanf("%d %lf", &cs.id, &cs.value);
-                insert_value(df->columns[i], &cs);
-                break;
-            }
-            default:
-                printf("Unsupported type for user input.\n");
-                break;
+    // Reduce memory usage if necessary
+    if (df->column_count > 0 && df->column_count == df->max_columns / 4) {
+        COLUMN **new_columns = realloc(df->columns, (df->max_columns / 2) * sizeof(COLUMN *));
+        if (new_columns) {
+            df->columns = new_columns;
+            df->max_columns /= 2;
         }
     }
 }
 
-// Hard-fill the dataframe with provided data for testing purposes
-void hard_fill_dataframe(DATAFRAME *df, void **data, unsigned int num_rows, unsigned int num_columns) {
-    if (!df || !data) return;
-    if (num_columns > df->column_count) {
-        fprintf(stderr, "More columns provided than exist in the dataframe.\n");
-        return;
-    }
-    for (unsigned int i = 0; i < num_columns; i++) {
-        for (unsigned int j = 0; j < num_rows; j++) {
-            insert_value(df->columns[i], ((void **)data[i])[j]);
-        }
-    }
-}
 
-// Display the entire contents of the dataframe
-void display_full_dataframe(DATAFRAME *df) {
-    if (!df || df->column_count == 0) {
-        printf("Dataframe is empty or NULL.\n");
-        return;
-    }
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        printf("Column %u (%s):\n", i, df->columns[i]->title);
-        print_col(df->columns[i]);
-    }
-}
 
-// Display a specified number of rows from the dataframe
-void display_dataframe_rows(DATAFRAME *df, unsigned int rows) {
-    if (!df) {
-        printf("Dataframe is NULL.\n");
-        return;
-    }
-    printf("Displaying first %u rows of each column:\n", rows);
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        printf("Column %s:\n", df->columns[i]->title);
-        for (unsigned int j = 0; j < rows && j < df->columns[i]->size; j++) {
-            char value[256];
-            convert_value(df->columns[i], j, value, sizeof(value));
-            printf("%s\n", value);
-        }
-    }
-}
-
-// Display a specified number of columns from the dataframe
-void display_dataframe_columns(DATAFRAME *df, unsigned int columns) {
-    if (!df || columns > df->column_count) {
-        printf("Dataframe is NULL or column count exceeded.\n");
-        return;
-    }
-    printf("Displaying first %u columns:\n", columns);
-    for (unsigned int i = 0; i < columns; i++) {
-        printf("Column %s:\n", df->columns[i]->title);
-        print_col(df->columns[i]);
-    }
-}
-
-// Add a row of data to the dataframe
-void add_row_to_dataframe(DATAFRAME *df, void **row_data) {
-    if (!df || !row_data) {
-        printf("Dataframe or row data is NULL.\n");
-        return;
-    }
-    if (df->column_count == 0) {
-        printf("Dataframe has no columns.\n");
-        return;
-    }
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        insert_value(df->columns[i], row_data[i]);
-    }
-}
-
-// Delete a row from the dataframe
-void delete_row_from_dataframe(DATAFRAME *df, unsigned int row_index) {
-    if (!df) {
-        printf("Dataframe is NULL.\n");
-        return;
-    }
-    for (unsigned int i = 0; i < df->column_count; i++) {
-        if (row_index < df->columns[i]->size) {
-            // Remove the row by shifting all rows up
-            for (unsigned int j = row_index; j < df->columns[i]->size - 1; j++) {
-                df->columns[i]->data[j] = df->columns[i]->data[j + 1];
-            }
-            df->columns[i]->size--;
-        }
-    }
-}
-
-// Rename a column in the dataframe
 void rename_column_title(DATAFRAME *df, unsigned int column_index, const char *new_title) {
-    if (!df || column_index >= df->column_count) {
-        printf("Dataframe is NULL or index out of bounds.\n");
+    if (!df || column_index >= df->column_count || !new_title) {
+        printf("Invalid column index or new title.\n");
+        return;
+    }
+    char *new_title_copy = strdup(new_title);
+    if (!new_title_copy) {
+        printf("Failed to allocate memory for new title.\n");
         return;
     }
     free(df->columns[column_index]->title);
-    df->columns[column_index]->title = strdup(new_title);
+    df->columns[column_index]->title = new_title_copy;
 }
 
-// Check if a value exists anywhere in the dataframe
+
 int check_value_existence(DATAFRAME *df, void *value) {
-    if (!df) return 0;
+    if (!df || !value) {
+        printf("Invalid dataframe or value.\n");
+        return 0;
+    }
     for (unsigned int i = 0; i < df->column_count; i++) {
-        if (count_occurrences(df->columns[i], value) > 0) {
-            return 1;
+        for (unsigned int j = 0; j < df->columns[i]->size; j++) {
+            if (compare_values(df->columns[i]->column_type, df->columns[i]->data[j], value) == 0) {
+                return 1;  // Value found
+            }
         }
     }
-    return 0;
+    return 0;  // Value not found
 }
 
-// Get a value from a specific cell in the dataframe
+
 void *get_cell_value(DATAFRAME *df, unsigned int row, unsigned int column) {
     if (!df || column >= df->column_count || row >= df->columns[column]->size) {
-        printf("Dataframe is NULL or index out of bounds.\n");
+        printf("Invalid row or column index.\n");
         return NULL;
     }
     return df->columns[column]->data[row];
 }
 
-// Set a value for a specific cell in the dataframe
 void set_cell_value(DATAFRAME *df, unsigned int row, unsigned int column, void *value) {
-    if (!df || column >= df->column_count || row >= df->columns[column]->size) {
-        printf("Dataframe is NULL or index out of bounds.\n");
+    if (!df || column >= df->column_count || row >= df->columns[column]->size || !value) {
+        printf("Invalid row or column index, or null value provided.\n");
         return;
     }
-    // Free the old value and set the new one
-    free(df->columns[column]->data[row]);
-    df->columns[column]->data[row] = value ? memcpy(malloc(sizeof(value)), value, sizeof(value)) : NULL;
+
+    // Free the current memory if necessary
+    if (df->columns[column]->column_type == STRING) {
+        free(df->columns[column]->data[row]);  // Only free if it's a string or similarly dynamically allocated type
+    }
+
+    // Assign the new value based on the type
+    switch (df->columns[column]->column_type) {
+        case INT:
+            // Assuming value is a pointer to the integer to be assigned
+            *(int *)(df->columns[column]->data[row]) = *(int *)value;
+            break;
+        case FLOAT:
+            *(float *)(df->columns[column]->data[row]) = *(float *)value;
+            break;
+        case DOUBLE:
+            *(double *)(df->columns[column]->data[row]) = *(double *)value;
+            break;
+        case STRING:
+            // Duplicate the string to handle it safely
+            df->columns[column]->data[row] = strdup((char *)value);
+            break;
+        case STRUCTURE:
+            // If value is assumed to be a pointer to CustomStructure, allocate new memory and copy the data
+            df->columns[column]->data[row] = malloc(sizeof(CustomStructure));
+            if (df->columns[column]->data[row]) {
+                memcpy(df->columns[column]->data[row], value, sizeof(CustomStructure));
+            } else {
+                printf("Memory allocation failed for structure.\n");
+            }
+        default:
+            printf("Unhandled data type.\n");
+            break;
+    }
 }
 
-// Display all column names in the dataframe
+
 void display_column_names(DATAFRAME *df) {
     if (!df) {
-        printf("Dataframe is NULL.\n");
+        printf("Dataframe is uninitialized.\n");
         return;
     }
     printf("Column names:\n");
     for (unsigned int i = 0; i < df->column_count; i++) {
-        printf("%s\n", df->columns[i]->title);
+        printf("Column %u: %s\n", i + 1, df->columns[i]->title);
     }
 }
 
-#include "cdataframe.h"
-#include <stdio.h>
 
-// Display the total number of rows in the dataframe
 void display_row_count(DATAFRAME *df) {
-    if (!df || df->column_count == 0) {
-        printf("Dataframe is empty or NULL.\n");
-        return;
+    if (!df || df->column_count == 0 || !df->columns[0]) {
+        printf("Dataframe is empty or not properly initialized.\n");
+    } else {
+        printf("Number of rows: %u\n", df->columns[0]->size);
     }
-    // Assuming all columns have the same number of rows
-    printf("Total number of rows: %u\n", df->columns[0]->size);
 }
 
-// Display the total number of columns in the dataframe
 void display_column_count(DATAFRAME *df) {
     if (!df) {
-        printf("Dataframe is NULL.\n");
-        return;
+        printf("Dataframe is empty or not properly initialized.\n");
+    } else {
+        printf("Number of columns: %u\n", df->column_count);
     }
-    printf("Total number of columns: %u\n", df->column_count);
 }
 
-// Count cells in the dataframe equal to a specified value
 int count_cells_equal_to(DATAFRAME *df, void *value) {
-    if (!df || df->column_count == 0) {
-        return 0; // No columns to search
-    }
     int count = 0;
     for (unsigned int i = 0; i < df->column_count; i++) {
-        count += count_occurrences(df->columns[i], value);
+        for (unsigned int j = 0; j < df->columns[i]->size; j++) {
+            if (compare_values(df->columns[i]->column_type, df->columns[i]->data[j], value) == 0) {
+                count++;
+            }
+        }
     }
     return count;
 }
 
-// Count cells in the dataframe with values greater than the specified value
 int count_cells_greater_than(DATAFRAME *df, void *value) {
-    if (!df || df->column_count == 0) {
-        return 0;
-    }
     int count = 0;
     for (unsigned int i = 0; i < df->column_count; i++) {
         for (unsigned int j = 0; j < df->columns[i]->size; j++) {
@@ -338,11 +425,7 @@ int count_cells_greater_than(DATAFRAME *df, void *value) {
     return count;
 }
 
-// Count cells in the dataframe with values less than the specified value
 int count_cells_less_than(DATAFRAME *df, void *value) {
-    if (!df || df->column_count == 0) {
-        return 0;
-    }
     int count = 0;
     for (unsigned int i = 0; i < df->column_count; i++) {
         for (unsigned int j = 0; j < df->columns[i]->size; j++) {
